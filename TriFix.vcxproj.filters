@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ItemGroup><Filter Include="Source Files"><UniqueIdentifier>{3CF4223E-6537-4C42-9BC7-12E59A8E94C4}</UniqueIdentifier><Extensions>cpp</Extensions></Filter><Filter Include="Header Files"><UniqueIdentifier>{B1EF4D90-BE82-4FAE-8525-8CD8CF346199}</UniqueIdentifier><Extensions>h</Extensions></Filter></ItemGroup>
+  <ItemGroup><Filter Include="Source Files"><UniqueIdentifier>{3CF4223E-6537-4C42-9BC7-12E59A8E94C4}</UniqueIdentifier><Extensions>cpp</Extensions></Filter><Filter Include="Header Files"><UniqueIdentifier>{B1EF4D90-BE82-4FAE-8525-8CD8CF346199}</UniqueIdentifier><Extensions>h</Extensions></Filter><Filter Include="Shader Files"><UniqueIdentifier>{E30C905F-43C7-42BE-89D7-67D25704D9DD}</UniqueIdentifier><Extensions>hlsl</Extensions></Filter></ItemGroup>
   <ItemGroup><ClInclude Include="include\TriFix\Application.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="include\TriFix\Renderer.h"><Filter>Header Files</Filter></ClInclude><ClInclude Include="include\TriFix\Window.h"><Filter>Header Files</Filter></ClInclude></ItemGroup>
   <ItemGroup><ClCompile Include="src\Application.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="src\Renderer.cpp"><Filter>Source Files</Filter></ClCompile><ClCompile Include="src\Window.cpp"><Filter>Source Files</Filter></ClCompile></ItemGroup>
+  <ItemGroup><FxCompile Include="shaders\GridVertex.hlsl"><Filter>Shader Files</Filter></FxCompile><FxCompile Include="shaders\GridPixel.hlsl"><Filter>Shader Files</Filter></FxCompile></ItemGroup>
 </Project>

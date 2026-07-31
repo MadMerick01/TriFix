@@ -16,7 +16,9 @@ public:
     void Render();
 
 private:
+    void CreateCalibrationGridPipeline();
     void CreateRenderTarget();
+    void DrawCalibrationGrid();
     void ResizeIfNeeded();
 
     HWND window_ = nullptr;
@@ -26,6 +28,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context_;
     Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTarget_;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> gridVertexBuffer_;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> gridVertexShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> gridPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> gridInputLayout_;
 };
 
 } // namespace trifix

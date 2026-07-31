@@ -5,7 +5,7 @@
 namespace trifix {
 
 Application::Application(HINSTANCE instance)
-    : window_(instance, L"TriFix 0.01", 1280, 720),
+    : window_(instance, L"TriFix 0.02 - Calibration Grid", 1280, 720),
       renderer_(window_.Handle()) {}
 
 int Application::Run() {
