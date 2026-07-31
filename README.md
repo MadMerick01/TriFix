@@ -1,6 +1,6 @@
-# TriFix 0.01
+# TriFix 0.02
 
-TriFix is a C++20 Win32 and Direct3D 11 application scaffold. Version 0.01 opens a resizable window and continuously presents a dark grey back buffer.
+TriFix is a C++20 Win32 and Direct3D 11 application scaffold. Version 0.02 renders a GPU-generated, pixel-accurate calibration grid over a dark grey back buffer and adapts it to the resizable window.
 
 ## Build
 
@@ -14,7 +14,7 @@ The Windows 10/11 SDK and the **Desktop development with C++** workload are requ
 
 - `src/` — implementation and Windows entry point
 - `include/` — public application, window, and rendering interfaces
-- `shaders/` — reserved for future HLSL shaders
+- `shaders/` — HLSL vertex and pixel shaders
 - `assets/` — reserved for runtime assets
 - `config/` — reserved for calibration and application configuration
 - `docs/` — design and milestone documentation
