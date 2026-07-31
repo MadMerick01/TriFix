@@ -1,0 +1,12 @@
+# Visual Studio workspace and user-specific files
+.vs/
+*.VC.db
+*.VC.opendb
+*.user
+*.suo
+
+# C++ build output and intermediate files
+x64/
+Debug/
+Release/
+ipch/
