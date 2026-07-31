@@ -32,6 +32,7 @@
     <ClInclude Include="include\TriFix\Geometry\Camera.h" />
     <ClInclude Include="include\TriFix\Geometry\Monitor.h" />
     <ClInclude Include="include\TriFix\Geometry\MonitorLayout.h" />
+    <ClInclude Include="include\TriFix\Geometry\MonitorGeometry.h" />
     <ClInclude Include="include\TriFix\Geometry\Plane.h" />
     <ClInclude Include="include\TriFix\Geometry\Ray.h" />
     <ClInclude Include="include\TriFix\Geometry\Vector2.h" />
@@ -40,7 +41,7 @@
     <ClInclude Include="include\TriFix\Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Application.cpp" /><ClCompile Include="src\main.cpp" /><ClCompile Include="src\Renderer.cpp" /><ClCompile Include="src\Window.cpp" />
+    <ClCompile Include="src\Application.cpp" /><ClCompile Include="src\main.cpp" /><ClCompile Include="src\MonitorGeometry.cpp" /><ClCompile Include="src\Renderer.cpp" /><ClCompile Include="src\Window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders\GridVertex.hlsl"><ShaderType>Vertex</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
