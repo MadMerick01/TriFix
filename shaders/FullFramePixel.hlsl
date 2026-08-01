@@ -16,16 +16,16 @@ float3 PanelCentre(uint panel)
     return float3(side * hinge, 0.0f, Depth) + side * hinge * PanelRight(yaw);
 }
 
-float2 InverseMap(float2 localPixel, uint panel, out float3 point)
+float2 InverseMap(float2 localPixel, uint panel, out float3 physicalPoint)
 {
     float yaw = panel == 0u ? -radians(50.0f) : (panel == 2u ? radians(50.0f) : 0.0f);
     float2 localMetres = float2((localPixel.x / Resolution.x - 0.5f) * Visible.x,
                                 (0.5f - localPixel.y / Resolution.y) * Visible.y);
-    point = PanelCentre(panel) + PanelRight(yaw) * localMetres.x +
-            float3(0.0f, localMetres.y, 0.0f);
+    physicalPoint = PanelCentre(panel) + PanelRight(yaw) * localMetres.x +
+                    float3(0.0f, localMetres.y, 0.0f);
     // Intersect the eye ray with z=Depth. This is exactly one perspective division.
-    float scale = Depth / point.z;
-    float2 referenceMetres = point.xy * scale;
+    float scale = Depth / physicalPoint.z;
+    float2 referenceMetres = physicalPoint.xy * scale;
     return float2(referenceMetres.x / ReferenceSize.x + 0.5f,
                   0.5f - referenceMetres.y / ReferenceSize.y);
 }
