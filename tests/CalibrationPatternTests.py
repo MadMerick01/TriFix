@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused source-level validation for the calibration reference line."""
+"""Focused numerical and source validation for the calibration pattern."""
 
 import math
 import re
@@ -55,7 +55,59 @@ def main() -> None:
     assert left_outer == right_outer
     assert math.isclose(left_outer - left_join, right_outer - right_join)
 
-    print("Calibration reference line is horizontal, continuous, and mirrored.")
+    # Independently reproduce the shader's general ray/plane construction. A point on
+    # either eye-facing reference plane is projected onto its physical monitor plane.
+    width, height, bezel = 0.620, 0.349, 0.006
+    resolution = (2560.0, 1440.0)
+    angle = math.radians(50.0)
+    eye = (0.0, 0.0, 0.0)
+
+    def dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+        return sum(x * y for x, y in zip(a, b))
+
+    def projected(reference_pixel: tuple[float, float], side: int) -> tuple[float, float]:
+        yaw = -side * angle
+        right = (math.cos(yaw), 0.0, -math.sin(yaw))
+        hinge = width / 2.0 + bezel
+        centre = (side * hinge + side * hinge * right[0], 0.0,
+                  0.520 + side * hinge * right[2])
+        normal_length = math.sqrt(dot(centre, centre))
+        view_normal = tuple(value / normal_length for value in centre)
+        view_right = (view_normal[2], 0.0, -view_normal[0])
+        local = ((reference_pixel[0] / resolution[0] - 0.5) * width,
+                 (0.5 - reference_pixel[1] / resolution[1]) * height)
+        target = tuple(centre[i] + local[0] * view_right[i] +
+                       local[1] * (1.0 if i == 1 else 0.0) for i in range(3))
+        monitor_normal = (-math.sin(yaw), 0.0, -math.cos(yaw))
+        ray_scale = dot(monitor_normal, centre) / dot(monitor_normal, target)
+        hit = tuple(ray_scale * value for value in target)
+        offset = tuple(hit[i] - centre[i] for i in range(3))
+        monitor_local = (dot(offset, right), offset[1])
+        return ((monitor_local[0] / width + 0.5) * resolution[0],
+                (0.5 - monitor_local[1] / height) * resolution[1])
+
+    square_corners = [(1660.0, 840.0), (2060.0, 840.0),
+                      (2060.0, 1240.0), (1660.0, 1240.0)]
+    left = [projected(point, -1) for point in square_corners]
+    right = [projected((resolution[0] - point[0], point[1]), 1)
+             for point in square_corners]
+    for left_point, right_point in zip(left, right):
+        assert math.isclose(left_point[0] + right_point[0], resolution[0], abs_tol=1e-9)
+        assert math.isclose(left_point[1], right_point[1], abs_tol=1e-9)
+    # Perspective makes the projected corners non-affine in pixel space.
+    assert not math.isclose(left[1][1] - left[0][1], left[2][1] - left[3][1])
+
+    shape_function = require(
+        r"float2 ApparentShapePixels\(float2 localPixels, uint region\)\s*\{(.*?)\n\}",
+        source,
+    ).group(1)
+    require(r"dot\(viewNormal, monitorCentre - eye\) / dot\(viewNormal, ray\)", shape_function)
+    require(r"const float2 visibleMetres", shape_function)
+    require(r"referencePixels\.x = resolution\.x - referencePixels\.x", shape_function)
+    assert "PerspectiveReferenceY" not in shape_function
+    assert not re.search(r"shear|shapeSlope|fittedOffset", shape_function, re.IGNORECASE)
+
+    print("Calibration line and geometric side-shape projection passed validation.")
 
 
 if __name__ == "__main__":
