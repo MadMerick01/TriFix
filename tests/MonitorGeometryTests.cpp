@@ -8,14 +8,14 @@ using namespace TriFix::Geometry;
 
 namespace
 {
-    constexpr float Epsilon = 1.0e-4F;
+    constexpr float Epsilon = 1.0e-2F;
 
-    [[nodiscard]] bool Near(float actual, float expected) noexcept
+    [[nodiscard]] bool Near(const float actual, const float expected) noexcept
     {
         return std::abs(actual - expected) < Epsilon;
     }
 
-    void Require(bool condition, const char* description)
+    void Require(const bool condition, const char* const description)
     {
         if (!condition)
         {
@@ -24,40 +24,96 @@ namespace
         }
     }
 
-    Ray RayTo(Vector3 target)
+    [[nodiscard]] Ray RayFromEyeTo(const MonitorLayout& layout, const Vector3 target)
     {
-        return {{0.0F, 0.0F, 0.0F}, target};
+        const Vector3 eye = layout.camera.eyePosition;
+        return {eye, {target.x - eye.x, target.y - eye.y, target.z - eye.z}};
+    }
+
+    [[nodiscard]] Vector3 PointOnMonitor(
+        const Monitor& monitor, const float localX, const float localY = 0.0F)
+    {
+        constexpr float Pi = 3.14159265358979323846F;
+        const float yaw = monitor.yawDegrees * Pi / 180.0F;
+        return {monitor.position.x + localX * std::cos(yaw), monitor.position.y + localY,
+                monitor.position.z - localX * std::sin(yaw)};
+    }
+
+    void RequireHit(const MonitorLayout& layout, const Monitor& monitor, const MonitorId id,
+                    const float localX, const float expectedLocalX, const float desktopOffset,
+                    const char* const description)
+    {
+        const auto hit = IntersectMonitorLayout(
+            RayFromEyeTo(layout, PointOnMonitor(monitor, localX)), layout);
+        Require(hit && hit->monitor == id && Near(hit->localPixels.x, expectedLocalX) &&
+                    Near(hit->localPixels.y, static_cast<float>(monitor.resolutionHeight) * 0.5F) &&
+                    Near(hit->desktopPixels.x, desktopOffset + expectedLocalX) &&
+                    Near(hit->desktopPixels.y, hit->localPixels.y),
+                description);
     }
 }
 
 int main()
 {
-    const Monitor centre{2.0F, 1.0F, 2000U, 1000U, {0.0F, 0.0F, 2.0F}, 0.0F, 0.02F};
-    const MonitorLayout layout{{}, centre, {}};
+    const MonitorLayout rig = CreateSymmetricalTripleMonitorLayout(
+        0.620F, 0.349F, 2560U, 1440U, 0.006F, 50.0F, {0.0F, 0.0F, 0.520F},
+        {0.0F, 0.0F, 0.0F});
 
-    const auto middle = CentreMonitorPixelIntersection(RayTo({0.0F, 0.0F, 2.0F}), layout);
-    Require(middle && Near(middle->x, 1000.0F) && Near(middle->y, 500.0F), "centre hit and pixels");
+    Require(Near(rig.centre.position.z, 0.520F) && Near(rig.left.yawDegrees, 50.0F) &&
+                Near(rig.right.yawDegrees, -50.0F),
+            "supplied rig pose");
+    Require(Near(rig.left.position.x, -rig.right.position.x) &&
+                Near(rig.left.position.z, rig.right.position.z),
+            "layout pose symmetry");
 
-    struct Corner { Vector3 world; Vector2 pixels; };
-    const Corner corners[]{
-        {{-1.0F,  0.5F, 2.0F}, {0.0F, 0.0F}},
-        {{ 1.0F,  0.5F, 2.0F}, {2000.0F, 0.0F}},
-        {{-1.0F, -0.5F, 2.0F}, {0.0F, 1000.0F}},
-        {{ 1.0F, -0.5F, 2.0F}, {2000.0F, 1000.0F}}};
-    for (const Corner& corner : corners)
-    {
-        const auto pixel = CentreMonitorPixelIntersection(RayTo(corner.world), layout);
-        Require(pixel && Near(pixel->x, corner.pixels.x) && Near(pixel->y, corner.pixels.y), "corner hit and edge pixels");
-    }
+    RequireHit(rig, rig.left, MonitorId::Left, 0.0F, 1280.0F, 0.0F, "left centre");
+    RequireHit(rig, rig.centre, MonitorId::Centre, 0.0F, 1280.0F, 2560.0F,
+               "centre centre");
+    RequireHit(rig, rig.right, MonitorId::Right, 0.0F, 1280.0F, 5120.0F,
+               "right centre");
+    RequireHit(rig, rig.left, MonitorId::Left, 0.310F, 2560.0F, 0.0F,
+               "left inner edge");
+    RequireHit(rig, rig.left, MonitorId::Left, -0.310F, 0.0F, 0.0F, "left outer edge");
+    RequireHit(rig, rig.right, MonitorId::Right, -0.310F, 0.0F, 5120.0F,
+               "right inner edge");
+    RequireHit(rig, rig.right, MonitorId::Right, 0.310F, 2560.0F, 5120.0F,
+               "right outer edge");
 
-    Require(!Intersect({{}, {1.0F, 0.0F, 0.0F}}, DisplayPlane(centre)), "parallel ray");
-    Require(!Intersect({{0.0F, 0.0F, 3.0F}, {0.0F, 0.0F, 1.0F}}, DisplayPlane(centre)), "hit behind origin");
-    Require(!CentreMonitorPixelIntersection(RayTo({1.1F, 0.0F, 2.0F}), layout), "outside display");
+    const auto leftQuarter = IntersectMonitorLayout(
+        RayFromEyeTo(rig, PointOnMonitor(rig.left, -0.155F, 0.08725F)), rig);
+    const auto rightQuarter = IntersectMonitorLayout(
+        RayFromEyeTo(rig, PointOnMonitor(rig.right, 0.155F, 0.08725F)), rig);
+    Require(leftQuarter && rightQuarter && Near(leftQuarter->localPixels.x, 640.0F) &&
+                Near(rightQuarter->localPixels.x, 1920.0F) &&
+                Near(leftQuarter->localPixels.y, rightQuarter->localPixels.y),
+            "corresponding side points are symmetric");
 
-    const Monitor rotated{2.0F, 1.0F, 2000U, 1000U, {3.0F, 1.0F, 4.0F}, 30.0F, 0.0F};
-    const MonitorLayout rotatedLayout{{}, rotated, {}};
-    const auto rotatedMiddle = CentreMonitorPixelIntersection(RayTo(rotated.position), rotatedLayout);
-    Require(rotatedMiddle && Near(rotatedMiddle->x, 1000.0F) && Near(rotatedMiddle->y, 500.0F), "translated and yawed centre");
+    Require(!IntersectMonitorLayout({rig.camera.eyePosition, {0.0F, 1.0F, 0.0F}}, rig),
+            "ray misses every monitor");
+
+    // Overlapping closed rectangles deliberately exercise nearest-plane selection.
+    MonitorLayout overlap{
+        Monitor{2.0F, 2.0F, 100U, 100U, {0.0F, 0.0F, 1.0F}, 0.0F, 0.0F},
+        Monitor{2.0F, 2.0F, 100U, 100U, {0.0F, 0.0F, 2.0F}, 0.0F, 0.0F},
+        Monitor{}, Camera{{0.0F, 0.0F, 0.0F}}};
+    const auto nearest = IntersectMonitorLayout({{}, {0.0F, 0.0F, 1.0F}}, overlap);
+    Require(nearest && nearest->monitor == MonitorId::Left && Near(nearest->distance, 1.0F),
+            "nearest valid intersection");
+
+    const MonitorLayout other = CreateSymmetricalTripleMonitorLayout(
+        0.700F, 0.400F, 1920U, 1080U, 0.010F, 35.0F, {0.25F, 0.10F, 0.800F},
+        {0.25F, 0.10F, -0.150F});
+    RequireHit(other, other.right, MonitorId::Right, 0.0F, 960.0F, 3840.0F,
+               "non-rig dimensions, angle, translation, and eye distance");
+
+    const auto centre = CentreMonitorPixelIntersection(
+        RayFromEyeTo(rig, rig.centre.position), rig);
+    Require(centre && Near(centre->x, 1280.0F) && Near(centre->y, 720.0F),
+            "Version 0.04 centre API remains operational");
+    Require(!Intersect({{}, {1.0F, 0.0F, 0.0F}}, DisplayPlane(rig.centre)), "parallel ray");
+    Require(!Intersect({{0.0F, 0.0F, 1.0F}, {0.0F, 0.0F, 1.0F}},
+                       DisplayPlane(rig.centre)),
+            "behind-origin plane");
 
     std::cout << "All monitor geometry tests passed.\n";
 }

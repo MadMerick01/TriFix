@@ -1,6 +1,8 @@
 #include "TriFix/Geometry/MonitorGeometry.h"
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 
 #include "TriFix/Geometry/MonitorLayout.h"
 
@@ -69,8 +71,10 @@ namespace TriFix::Geometry
     {
         const float halfWidth = monitor.physicalWidthMetres * 0.5F;
         const float halfHeight = monitor.physicalHeightMetres * 0.5F;
+        constexpr float edgeTolerance = 1.0e-6F;
         return monitor.physicalWidthMetres > 0.0F && monitor.physicalHeightMetres > 0.0F &&
-               std::abs(localPoint.x) <= halfWidth && std::abs(localPoint.y) <= halfHeight;
+               std::abs(localPoint.x) <= halfWidth + edgeTolerance &&
+               std::abs(localPoint.y) <= halfHeight + edgeTolerance;
     }
 
     std::optional<Vector2> MonitorLocalToPixels(
@@ -82,10 +86,14 @@ namespace TriFix::Geometry
             return std::nullopt;
         }
 
+        const float clampedX = std::clamp(localPoint.x, -monitor.physicalWidthMetres * 0.5F,
+                                          monitor.physicalWidthMetres * 0.5F);
+        const float clampedY = std::clamp(localPoint.y, -monitor.physicalHeightMetres * 0.5F,
+                                          monitor.physicalHeightMetres * 0.5F);
         return Vector2{
-            (localPoint.x / monitor.physicalWidthMetres + 0.5F) *
+            (clampedX / monitor.physicalWidthMetres + 0.5F) *
                 static_cast<float>(monitor.resolutionWidth),
-            (0.5F - localPoint.y / monitor.physicalHeightMetres) *
+            (0.5F - clampedY / monitor.physicalHeightMetres) *
                 static_cast<float>(monitor.resolutionHeight)};
     }
 
@@ -99,5 +107,60 @@ namespace TriFix::Geometry
             return std::nullopt;
         }
         return MonitorLocalToPixels(WorldToMonitorLocal(intersection->point, monitor), monitor);
+    }
+
+    MonitorLayout CreateSymmetricalTripleMonitorLayout(
+        const float visibleWidthMetres,
+        const float visibleHeightMetres,
+        const std::uint32_t resolutionWidth,
+        const std::uint32_t resolutionHeight,
+        const float bezelWidthMetres,
+        const float sideInwardAngleDegrees,
+        const Vector3 centrePosition,
+        const Vector3 eyePosition) noexcept
+    {
+        const Monitor centre{visibleWidthMetres, visibleHeightMetres, resolutionWidth,
+                             resolutionHeight, centrePosition, 0.0F, bezelWidthMetres};
+        const float hingeOffset = visibleWidthMetres * 0.5F + bezelWidthMetres;
+        const Vector3 leftHinge{centrePosition.x - hingeOffset, centrePosition.y, centrePosition.z};
+        const Vector3 rightHinge{centrePosition.x + hingeOffset, centrePosition.y, centrePosition.z};
+
+        Monitor left{visibleWidthMetres, visibleHeightMetres, resolutionWidth, resolutionHeight,
+                     {}, sideInwardAngleDegrees, bezelWidthMetres};
+        Monitor right{visibleWidthMetres, visibleHeightMetres, resolutionWidth, resolutionHeight,
+                      {}, -sideInwardAngleDegrees, bezelWidthMetres};
+        const Vector3 leftRight = MonitorRight(left);
+        const Vector3 rightRight = MonitorRight(right);
+        left.position = {leftHinge.x - hingeOffset * leftRight.x, leftHinge.y,
+                         leftHinge.z - hingeOffset * leftRight.z};
+        right.position = {rightHinge.x + hingeOffset * rightRight.x, rightHinge.y,
+                          rightHinge.z + hingeOffset * rightRight.z};
+        return {left, centre, right, Camera{eyePosition}};
+    }
+
+    std::optional<MonitorHit> IntersectMonitorLayout(
+        const Ray& ray, const MonitorLayout& layout) noexcept
+    {
+        const Monitor* const monitors[]{&layout.left, &layout.centre, &layout.right};
+        constexpr MonitorId ids[]{MonitorId::Left, MonitorId::Centre, MonitorId::Right};
+        std::optional<MonitorHit> nearest;
+        float desktopOffset = 0.0F;
+        for (std::size_t index = 0; index < std::size(monitors); ++index)
+        {
+            const Monitor& monitor = *monitors[index];
+            const auto planeHit = Intersect(ray, DisplayPlane(monitor));
+            if (planeHit)
+            {
+                const auto pixels = MonitorLocalToPixels(
+                    WorldToMonitorLocal(planeHit->point, monitor), monitor);
+                if (pixels && (!nearest || planeHit->distance < nearest->distance))
+                {
+                    nearest = MonitorHit{ids[index], planeHit->point, planeHit->distance, *pixels,
+                                         {desktopOffset + pixels->x, pixels->y}};
+                }
+            }
+            desktopOffset += static_cast<float>(monitor.resolutionWidth);
+        }
+        return nearest;
     }
 }
