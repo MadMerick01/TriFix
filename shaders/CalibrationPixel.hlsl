@@ -68,11 +68,11 @@ float3 MonitorCentre(uint region, float width, float bezel, float yaw)
     float side = region == 0u ? -1.0f : 1.0f;
     float hinge = width * 0.5f + bezel;
     float3 innerHinge = float3(side * hinge, 0.0f, 0.520f);
-    float3 right = MonitorRight(side < 0.0f ? yaw : -yaw);
+    float3 right = MonitorRight(side < 0.0f ? -yaw : yaw);
     return innerHinge + side * hinge * right;
 }
 
-float2 ApparentShapePixels(float2 localPixels, uint region)
+float2 ApparentCoordinates(float2 localPixels, uint region)
 {
     // Rig values are expressed once as physical inputs. Shape distortion follows from
     // the monitor pose and eye rays below; there are no fitted pixel offsets or slopes.
@@ -83,44 +83,48 @@ float2 ApparentShapePixels(float2 localPixels, uint region)
     const float3 eye = float3(0.0f, 0.0f, 0.0f);
 
     if (region == 1u)
-        return localPixels;
+        return (localPixels - float2(1280.0f, 720.0f)) / resolution.y;
 
-    float yaw = region == 0u ? sideYaw : -sideYaw;
+    float yaw = region == 0u ? -sideYaw : sideYaw;
     float3 monitorCentre = MonitorCentre(region, visibleMetres.x, bezelMetres, sideYaw);
     float3 monitorPoint = monitorCentre +
         MonitorRight(yaw) * ((localPixels.x / resolution.x - 0.5f) * visibleMetres.x) +
         float3(0.0f, (0.5f - localPixels.y / resolution.y) * visibleMetres.y, 0.0f);
 
-    // The reference plane passes through the side display centre and faces the eye.
-    // Intersecting every display-pixel ray with it gives an exact projective mapping.
-    float3 viewNormal = normalize(monitorCentre - eye);
-    float3 viewRight = normalize(float3(viewNormal.z, 0.0f, -viewNormal.x));
+    // Eye-centred image plane: forward is through this monitor's physical centre, right is
+    // horizontal, and up is world +Y.  Dividing both components by the ray's forward depth
+    // exactly once produces tangent/image-plane coordinates.  These are visual coordinates,
+    // not monitor metres or desktop pixels.
+    float3 forward = normalize(monitorCentre - eye);
+    float3 imageRight = normalize(float3(forward.z, 0.0f, -forward.x));
     float3 ray = monitorPoint - eye;
-    float distance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, ray);
-    float3 referencePoint = eye + distance * ray;
-    float3 referenceOffset = referencePoint - monitorCentre;
-    float2 referenceLocal = float2(dot(referenceOffset, viewRight), referenceOffset.y);
+    float depth = dot(ray, forward);
+    return float2(dot(ray, imageRight) / depth, ray.y / depth);
+}
 
-    // The eye-facing plane is almost edge-on to a 50-degree side panel.  Consequently its
-    // *projected* horizontal footprint is much narrower than the panel's 620 mm physical
-    // width.  Version 0.06 previously divided referenceLocal by 620 mm, confusing those two
-    // spaces and placing both shapes outside the screen.  Project the physical left/right
-    // panel edges onto the reference plane and use that measured span as the reference-canvas
-    // width.  One isotropic metre-per-pixel scale is used for both axes, so circles remain
-    // circles at the calibrated eye rather than being independently stretched to the panel.
-    float3 leftEdge = monitorCentre - MonitorRight(yaw) * (visibleMetres.x * 0.5f);
-    float3 rightEdge = monitorCentre + MonitorRight(yaw) * (visibleMetres.x * 0.5f);
-    float leftDistance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, leftEdge - eye);
-    float rightDistance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, rightEdge - eye);
-    float leftReferenceX = dot(eye + leftDistance * (leftEdge - eye) - monitorCentre, viewRight);
-    float rightReferenceX = dot(eye + rightDistance * (rightEdge - eye) - monitorCentre, viewRight);
-    float referenceMinX = min(leftReferenceX, rightReferenceX);
-    float referenceSpan = abs(rightReferenceX - leftReferenceX);
-    float referenceMetresPerPixel = referenceSpan / resolution.x;
-    float2 referencePixels = float2((referenceLocal.x - referenceMinX) / referenceSpan * resolution.x,
-                                    resolution.y * 0.5f -
-                                        referenceLocal.y / referenceMetresPerPixel);
-    return referencePixels;
+float2 ApparentShapeCentre(uint region, float referenceX)
+{
+    if (region == 1u)
+        return float2((referenceX - 1280.0f) / 1440.0f, (720.0f - 1040.0f) / 1440.0f);
+
+    // Positions are defined by rays through fractional locations on the actual monitor,
+    // rather than by fitted offsets in the image plane.
+    if (region == 2u)
+        referenceX = 2560.0f - referenceX;
+    float2 local = float2(referenceX, 1040.0f);
+    return ApparentCoordinates(local, region);
+}
+
+float ApparentShapeRadius(uint region)
+{
+    if (region == 1u)
+        return 200.0f / 1440.0f;
+
+    // Derive one visual unit from the apparent vertical separation of two physical points
+    // 400 local pixels apart at panel centre.  No horizontal panel span participates.
+    float2 top = ApparentCoordinates(float2(1280.0f, 520.0f), region);
+    float2 bottom = ApparentCoordinates(float2(1280.0f, 920.0f), region);
+    return length(top - bottom) * 0.5f;
 }
 
 float4 main(float4 position : SV_POSITION) : SV_TARGET
@@ -136,12 +140,14 @@ float4 main(float4 position : SV_POSITION) : SV_TARGET
     bool boundary = abs(p.x - 2560.0f) < 4.0f || abs(p.x - 5120.0f) < 4.0f;
     bool crosshair = (abs(q.x - 1280.0f) < 3.0f && abs(q.y - 720.0f) < 80.0f) ||
                      (abs(q.y - 720.0f) < 3.0f && abs(q.x - 1280.0f) < 80.0f);
-    float2 shapePoint = ApparentShapePixels(q, region);
-    float2 circleDelta = shapePoint - float2(700.0f, 1040.0f);
-    bool circle = abs(length(circleDelta) - 200.0f) < 3.0f; // 400-pixel diameter
-    float2 squareDelta = abs(shapePoint - float2(1860.0f, 1040.0f));
-    bool square = max(squareDelta.x, squareDelta.y) >= 197.0f &&
-                  max(squareDelta.x, squareDelta.y) <= 203.0f; // 400 x 400 pixels
+    float2 shapePoint = ApparentCoordinates(q, region);
+    float radius = ApparentShapeRadius(region);
+    float stroke = radius * (3.0f / 200.0f);
+    float2 circleDelta = shapePoint - ApparentShapeCentre(region, 700.0f);
+    bool circle = abs(length(circleDelta) - radius) < stroke;
+    float2 squareDelta = abs(shapePoint - ApparentShapeCentre(region, 1860.0f));
+    bool square = max(squareDelta.x, squareDelta.y) >= radius - stroke &&
+                  max(squareDelta.x, squareDelta.y) <= radius + stroke;
     bool corners = ((q.x < 35.0f || q.x > 2525.0f) && (q.y < 4.0f || q.y > 1436.0f)) ||
                    ((q.y < 35.0f || q.y > 1405.0f) && (q.x < 4.0f || q.x > 2556.0f));
 

@@ -59,8 +59,8 @@ int main()
         0.620F, 0.349F, 2560U, 1440U, 0.006F, 50.0F, {0.0F, 0.0F, 0.520F},
         {0.0F, 0.0F, 0.0F});
 
-    Require(Near(rig.centre.position.z, 0.520F) && Near(rig.left.yawDegrees, 50.0F) &&
-                Near(rig.right.yawDegrees, -50.0F),
+    Require(Near(rig.centre.position.z, 0.520F) && Near(rig.left.yawDegrees, -50.0F) &&
+                Near(rig.right.yawDegrees, 50.0F),
             "supplied rig pose");
     Require(Near(rig.left.position.x, -rig.right.position.x) &&
                 Near(rig.left.position.z, rig.right.position.z),

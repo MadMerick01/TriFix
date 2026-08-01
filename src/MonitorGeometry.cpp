@@ -125,10 +125,13 @@ namespace TriFix::Geometry
         const Vector3 leftHinge{centrePosition.x - hingeOffset, centrePosition.y, centrePosition.z};
         const Vector3 rightHinge{centrePosition.x + hingeOffset, centrePosition.y, centrePosition.z};
 
+        // +yaw turns a panel's right edge toward -Z.  Consequently the left panel must use
+        // -yaw (and the right +yaw) so both outer edges come toward the eye.  The previous
+        // signs put their outer edges away from the eye and made each display almost edge-on.
         Monitor left{visibleWidthMetres, visibleHeightMetres, resolutionWidth, resolutionHeight,
-                     {}, sideInwardAngleDegrees, bezelWidthMetres};
+                     {}, -sideInwardAngleDegrees, bezelWidthMetres};
         Monitor right{visibleWidthMetres, visibleHeightMetres, resolutionWidth, resolutionHeight,
-                      {}, -sideInwardAngleDegrees, bezelWidthMetres};
+                      {}, sideInwardAngleDegrees, bezelWidthMetres};
         const Vector3 leftRight = MonitorRight(left);
         const Vector3 rightRight = MonitorRight(right);
         left.position = {leftHinge.x - hingeOffset * leftRight.x, leftHinge.y,
