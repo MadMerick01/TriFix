@@ -74,8 +74,19 @@ def main() -> None:
         normal_length = math.sqrt(dot(centre, centre))
         view_normal = tuple(value / normal_length for value in centre)
         view_right = (view_normal[2], 0.0, -view_normal[0])
-        local = ((reference_pixel[0] / resolution[0] - 0.5) * width,
-                 (0.5 - reference_pixel[1] / resolution[1]) * height)
+        def reference_x(monitor_x: float) -> float:
+            edge = tuple(centre[i] + monitor_x * right[i] for i in range(3))
+            scale = dot(view_normal, centre) / dot(view_normal, edge)
+            projected_edge = tuple(scale * value for value in edge)
+            return dot(tuple(projected_edge[i] - centre[i] for i in range(3)), view_right)
+
+        reference_left = reference_x(-width / 2.0)
+        reference_right = reference_x(width / 2.0)
+        reference_min = min(reference_left, reference_right)
+        reference_span = abs(reference_right - reference_left)
+        metres_per_pixel = reference_span / resolution[0]
+        local = (reference_min + reference_pixel[0] * metres_per_pixel,
+                 (resolution[1] * 0.5 - reference_pixel[1]) * metres_per_pixel)
         target = tuple(centre[i] + local[0] * view_right[i] +
                        local[1] * (1.0 if i == 1 else 0.0) for i in range(3))
         monitor_normal = (-math.sin(yaw), 0.0, -math.cos(yaw))
@@ -97,13 +108,52 @@ def main() -> None:
     # Perspective makes the projected corners non-affine in pixel space.
     assert not math.isclose(left[1][1] - left[0][1], left[2][1] - left[3][1])
 
+    def validate_bounds(name: str, points: list[tuple[float, float]],
+                        desktop_offset: float) -> tuple[float, ...]:
+        assert points and all(math.isfinite(value) for point in points for value in point)
+        bounds = (min(point[0] for point in points), min(point[1] for point in points),
+                  max(point[0] for point in points), max(point[1] for point in points))
+        assert bounds[0] < resolution[0] and bounds[2] > 0.0
+        assert bounds[1] < resolution[1] and bounds[3] > 0.0
+        assert 10.0 < bounds[2] - bounds[0] <= resolution[0]
+        assert 10.0 < bounds[3] - bounds[1] <= resolution[1]
+        # Local side-monitor coordinates must not already contain a 2560/5120 desktop offset.
+        assert all(-1.0 <= value <= resolution[0] + 1.0 for point in points for value in point[:1])
+        combined = (bounds[0] + desktop_offset, bounds[1],
+                    bounds[2] + desktop_offset, bounds[3])
+        assert combined[0] < desktop_offset + resolution[0] and combined[2] > desktop_offset
+        print(f"{name}: x=[{bounds[0]:.3f}, {bounds[2]:.3f}], "
+              f"y=[{bounds[1]:.3f}, {bounds[3]:.3f}], "
+              f"size={bounds[2]-bounds[0]:.3f}x{bounds[3]-bounds[1]:.3f} px; "
+              f"desktop x=[{combined[0]:.3f}, {combined[2]:.3f}]")
+        return bounds
+
+    circle_points = [(700.0 + 200.0 * math.cos(index * math.tau / 720.0),
+                      1040.0 + 200.0 * math.sin(index * math.tau / 720.0))
+                     for index in range(720)]
+    shapes = {"square": square_corners, "circle": circle_points}
+    for shape_name, reference_points in shapes.items():
+        left_points = [projected(point, -1) for point in reference_points]
+        right_points = [projected((resolution[0] - point[0], point[1]), 1)
+                        for point in reference_points]
+        left_bounds = validate_bounds(f"left {shape_name}", left_points, 0.0)
+        right_bounds = validate_bounds(f"right {shape_name}", right_points, 5120.0)
+        for left_value, right_value in zip(left_bounds, right_bounds):
+            assert math.isfinite(left_value) and math.isfinite(right_value)
+        assert math.isclose(left_bounds[0] + right_bounds[2], resolution[0], abs_tol=1e-6)
+        assert math.isclose(left_bounds[2] + right_bounds[0], resolution[0], abs_tol=1e-6)
+        assert math.isclose(left_bounds[1], right_bounds[1], abs_tol=1e-6)
+        assert math.isclose(left_bounds[3], right_bounds[3], abs_tol=1e-6)
+
     shape_function = require(
         r"float2 ApparentShapePixels\(float2 localPixels, uint region\)\s*\{(.*?)\n\}",
         source,
     ).group(1)
     require(r"dot\(viewNormal, monitorCentre - eye\) / dot\(viewNormal, ray\)", shape_function)
     require(r"const float2 visibleMetres", shape_function)
-    require(r"referencePixels\.x = resolution\.x - referencePixels\.x", shape_function)
+    require(r"float referenceSpan = abs\(rightReferenceX - leftReferenceX\)", shape_function)
+    require(r"float referenceMetresPerPixel = referenceSpan / resolution\.x", shape_function)
+    assert "referencePixels.x = resolution.x - referencePixels.x" not in shape_function
     assert "PerspectiveReferenceY" not in shape_function
     assert not re.search(r"shear|shapeSlope|fittedOffset", shape_function, re.IGNORECASE)
 
