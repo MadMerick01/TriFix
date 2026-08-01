@@ -1,5 +1,5 @@
-// Version 0.05 diagnostic pattern. Coordinates are back-buffer pixel coordinates; no
-// perspective, bezel compensation, image capture, or reprojection is performed here.
+// Diagnostic pattern. The side-panel shape coordinates are reconstructed on a plane
+// facing the calibrated eye; this is a physical ray/plane projection, not a pixel skew.
 bool Glyph(float2 p, float2 origin, float scale, uint rows)
 {
     int2 cell = int2(floor((p - origin) / scale));
@@ -55,6 +55,60 @@ float PerspectiveReferenceY(float desktopX, uint region)
     return referenceY + abs(desktopX - innerJoinX) / 96.0f;
 }
 
+float3 MonitorRight(float yaw)
+{
+    return float3(cos(yaw), 0.0f, -sin(yaw));
+}
+
+float3 MonitorCentre(uint region, float width, float bezel, float yaw)
+{
+    if (region == 1u)
+        return float3(0.0f, 0.0f, 0.520f);
+
+    float side = region == 0u ? -1.0f : 1.0f;
+    float hinge = width * 0.5f + bezel;
+    float3 innerHinge = float3(side * hinge, 0.0f, 0.520f);
+    float3 right = MonitorRight(side < 0.0f ? yaw : -yaw);
+    return innerHinge + side * hinge * right;
+}
+
+float2 ApparentShapePixels(float2 localPixels, uint region)
+{
+    // Rig values are expressed once as physical inputs. Shape distortion follows from
+    // the monitor pose and eye rays below; there are no fitted pixel offsets or slopes.
+    const float2 visibleMetres = float2(0.620f, 0.349f);
+    const float2 resolution = float2(2560.0f, 1440.0f);
+    const float sideYaw = radians(50.0f);
+    const float bezelMetres = 0.006f;
+    const float3 eye = float3(0.0f, 0.0f, 0.0f);
+
+    if (region == 1u)
+        return localPixels;
+
+    float yaw = region == 0u ? sideYaw : -sideYaw;
+    float3 monitorCentre = MonitorCentre(region, visibleMetres.x, bezelMetres, sideYaw);
+    float3 monitorPoint = monitorCentre +
+        MonitorRight(yaw) * ((localPixels.x / resolution.x - 0.5f) * visibleMetres.x) +
+        float3(0.0f, (0.5f - localPixels.y / resolution.y) * visibleMetres.y, 0.0f);
+
+    // The reference plane passes through the side display centre and faces the eye.
+    // Intersecting every display-pixel ray with it gives an exact projective mapping.
+    float3 viewNormal = normalize(monitorCentre - eye);
+    float3 viewRight = normalize(float3(viewNormal.z, 0.0f, -viewNormal.x));
+    float3 ray = monitorPoint - eye;
+    float distance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, ray);
+    float3 referencePoint = eye + distance * ray;
+    float3 referenceOffset = referencePoint - monitorCentre;
+    float2 referenceLocal = float2(dot(referenceOffset, viewRight), referenceOffset.y);
+    float2 referencePixels = float2(referenceLocal.x / visibleMetres.x + 0.5f,
+                                    0.5f - referenceLocal.y / visibleMetres.y) * resolution;
+    // Mirror the right reference canvas so corresponding left/right boundaries are exact
+    // reflections about their respective screen centres.
+    if (region == 2u)
+        referencePixels.x = resolution.x - referencePixels.x;
+    return referencePixels;
+}
+
 float4 main(float4 position : SV_POSITION) : SV_TARGET
 {
     float2 p = position.xy;
@@ -68,9 +122,10 @@ float4 main(float4 position : SV_POSITION) : SV_TARGET
     bool boundary = abs(p.x - 2560.0f) < 4.0f || abs(p.x - 5120.0f) < 4.0f;
     bool crosshair = (abs(q.x - 1280.0f) < 3.0f && abs(q.y - 720.0f) < 80.0f) ||
                      (abs(q.y - 720.0f) < 3.0f && abs(q.x - 1280.0f) < 80.0f);
-    float2 circleDelta = q - float2(700.0f, 1040.0f);
+    float2 shapePoint = ApparentShapePixels(q, region);
+    float2 circleDelta = shapePoint - float2(700.0f, 1040.0f);
     bool circle = abs(length(circleDelta) - 200.0f) < 3.0f; // 400-pixel diameter
-    float2 squareDelta = abs(q - float2(1860.0f, 1040.0f));
+    float2 squareDelta = abs(shapePoint - float2(1860.0f, 1040.0f));
     bool square = max(squareDelta.x, squareDelta.y) >= 197.0f &&
                   max(squareDelta.x, squareDelta.y) <= 203.0f; // 400 x 400 pixels
     bool corners = ((q.x < 35.0f || q.x > 2525.0f) && (q.y < 4.0f || q.y > 1436.0f)) ||

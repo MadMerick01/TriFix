@@ -5,7 +5,7 @@
 namespace trifix {
 
 Application::Application(HINSTANCE instance)
-    : window_(instance, L"TriFix 0.05 - 620x349 mm, 2560x1440 x3, yaw 50 deg, eye 520 mm, bezel 6 mm", 1280, 720),
+    : window_(instance, L"TriFix 0.06 - 620x349 mm, 2560x1440 x3, yaw 50 deg, eye 520 mm, bezel 6 mm", 1280, 720),
       renderer_(window_.Handle()) {}
 
 int Application::Run() {
