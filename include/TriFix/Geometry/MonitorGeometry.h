@@ -33,6 +33,24 @@ namespace TriFix::Geometry
         float distance{};
     };
 
+    /// Result of inverse-mapping one physical output pixel to an eye-facing planar canvas.
+    struct ReferenceSample final
+    {
+        Vector3 monitorPoint{};
+        Vector3 eyeRay{}; // deliberately unnormalised: its direction is what is projected
+        Vector2 uv{};
+        Vector2 sourcePixels{};
+        bool valid{};
+    };
+
+    /// Reconstructs a pixel centre on monitor, casts its calibrated-eye ray, and intersects
+    /// the plane parallel to the centre display. The canvas is centred on the centre ray.
+    [[nodiscard]] ReferenceSample InverseMapToReference(
+        const Vector2& monitorLocalPixels, const Monitor& monitor,
+        const MonitorLayout& layout, std::uint32_t sourceWidth,
+        std::uint32_t sourceHeight, float referenceWidthMetres,
+        float referenceHeightMetres) noexcept;
+
     /// Returns no value when the ray is parallel to the plane or the hit is behind its origin.
     [[nodiscard]] std::optional<RayPlaneIntersection> Intersect(
         const Ray& ray, const Plane& plane, float parallelTolerance = 1.0e-6F) noexcept;

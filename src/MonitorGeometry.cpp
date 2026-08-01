@@ -166,4 +166,44 @@ namespace TriFix::Geometry
         }
         return nearest;
     }
+
+    ReferenceSample InverseMapToReference(
+        const Vector2& monitorLocalPixels, const Monitor& monitor,
+        const MonitorLayout& layout, const std::uint32_t sourceWidth,
+        const std::uint32_t sourceHeight, const float referenceWidthMetres,
+        const float referenceHeightMetres) noexcept
+    {
+        ReferenceSample result{};
+        if (monitor.resolutionWidth == 0U || monitor.resolutionHeight == 0U ||
+            sourceWidth == 0U || sourceHeight == 0U || referenceWidthMetres <= 0.0F ||
+            referenceHeightMetres <= 0.0F)
+            return result;
+
+        const Vector2 metres{
+            (monitorLocalPixels.x / static_cast<float>(monitor.resolutionWidth) - 0.5F) *
+                monitor.physicalWidthMetres,
+            (0.5F - monitorLocalPixels.y / static_cast<float>(monitor.resolutionHeight)) *
+                monitor.physicalHeightMetres};
+        const Vector3 right = MonitorRight(monitor);
+        result.monitorPoint = {monitor.position.x + metres.x * right.x,
+                               monitor.position.y + metres.y,
+                               monitor.position.z + metres.x * right.z};
+        const Vector3 eye = layout.camera.eyePosition;
+        result.eyeRay = {result.monitorPoint.x - eye.x, result.monitorPoint.y - eye.y,
+                         result.monitorPoint.z - eye.z};
+        const float referenceDepth = layout.centre.position.z - eye.z;
+        if (std::abs(result.eyeRay.z) <= 1.0e-8F)
+            return result;
+        // This is the sole perspective division in the inverse map.
+        const float scale = referenceDepth / result.eyeRay.z;
+        const float x = eye.x + result.eyeRay.x * scale - layout.centre.position.x;
+        const float y = eye.y + result.eyeRay.y * scale - layout.centre.position.y;
+        result.uv = {x / referenceWidthMetres + 0.5F, 0.5F - y / referenceHeightMetres};
+        result.sourcePixels = {result.uv.x * static_cast<float>(sourceWidth),
+                               result.uv.y * static_cast<float>(sourceHeight)};
+        result.valid = std::isfinite(result.uv.x) && std::isfinite(result.uv.y) &&
+                       result.uv.x >= 0.0F && result.uv.x <= 1.0F &&
+                       result.uv.y >= 0.0F && result.uv.y <= 1.0F;
+        return result;
+    }
 }

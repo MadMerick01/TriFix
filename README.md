@@ -1,9 +1,9 @@
-# TriFix 0.06
+# TriFix 0.07
 
-TriFix is a C++20 Win32/Direct3D 11 prototype. Version 0.06 adds physically projected
-side-monitor reference shapes to the separately tested triple-monitor geometry and diagnostic
-spanning calibration pattern. It does **not**
-yet capture, warp, or perspective-correct another application.
+TriFix is a C++20 Win32/Direct3D 11 prototype. Version 0.07 proves full-frame inverse reprojection with an internally generated, coherent
+eye-facing test canvas. The accepted Version 0.06 projected-shape calibration remains byte-for-byte
+in `CalibrationPixel.hlsl` as a comparison and fallback. This release does **not** capture or hook
+an external application.
 
 ## Build and controls
 
@@ -16,8 +16,12 @@ required.
   as one 7680 x 1440 row first. If other displays extend above or farther left, automatic
   selection remains intentionally conservative: use windowed mode and Windows Display
   Settings rather than relying on F11.
-- **Tab** switches between the Version 0.06 triple diagnostic and the retained Version
-  0.02 one-pixel grid.
+- **Tab** switches between the new Version 0.07 full-frame test (startup default) and the
+  unchanged Version 0.06 projected-shape calibration.
+- **D** toggles the 0.07 diagnostic view: red invalid samples, UV encoded as red/green, white
+  physical panel borders, green optical panel centres, and an amber 620-pixel rig-value bar.
+  The title supplies the calibrated 620 x 349 mm, 50 degree yaw, 520 mm eye and 6 mm bezel values.
+- **G** toggles the retained original one-pixel grid fallback independently.
 - **Escape** always exits, including from borderless mode.
 
 ## Measured calibration profile
@@ -84,8 +88,55 @@ From the normal driving eye position, verify and report:
 - whether Windows scaling or taskbars interfere;
 - whether the left and right patterns appear symmetrical.
 
-Version 0.06 proves that physical poses can be built from hinge geometry, rays can select and
-address all three visible rectangles, and a native combined-desktop diagnostic can be
-presented with perspective-correct reference shapes. A later version still needs application capture and full reprojection integration and
-configuration/display selection. Bezel correction, game capture/modification, and head
-tracking are expressly not claimed here.
+The retained Version 0.06 view proves that physical poses can be built from hinge geometry, rays
+can select all three rectangles, and projected reference shapes round-trip correctly. Version 0.07
+extends that proof to every output pixel of an internal canvas; application capture and display
+configuration remain future work. Bezel correction, game capture/modification, and head tracking
+are expressly not claimed here.
+
+
+## Version 0.07 full-frame inverse reprojection
+
+The procedural 7680 x 1440 reference canvas represents a 12.0 x 4.6 m eye-facing plane parallel
+to the centre display at 520 mm. This deliberately wide field contains the highly oblique hinge
+rays without clipping; source pixels need not represent square physical increments. It contains a regular square grid,
+large circles and a square, horizontal/vertical references, diagonals, a horizon, three
+colour-coded regions, and features that cross the nominal thirds. The centre physical panel maps
+linearly about the source centre, so it is an undistorted (scaled) reference view.
+
+For every output pixel the shader first selects its panel and removes the combined-desktop X
+offset. It independently converts 2560 X pixels to 620 mm and 1440 Y pixels to 349 mm, constructs
+the point from the panel centre and physical right/up basis, and casts the ray from the calibrated
+eye. That ray is intersected with the reference plane using exactly one depth division. Only then
+is the result converted to source UV/pixels. Invalid UVs are magenta rather than clamped, preventing
+edge-smear bands. Both side panels use one formula with a sign parameter; there are no fitted
+coefficients, manual mirror operations, shears, or per-side distortion constants. The Geometry
+layer exposes the matching CPU operation and remains free of Windows and graphics APIs.
+
+The numerical test uses a `0.01` tolerance (in the reported coordinate's units) and exercises each
+panel's centre, four corners, upper/lower probes, inner/outer edges and joins; mirror classification;
+finite/out-of-range behavior; ray-to-point reconstruction; centre identity; and a translated second
+layout with 700 x 400 mm panels, 35 degree yaw, 950 mm eye-plane distance, and 1920 x 1080 pixels.
+It deliberately derives the horizon nowhere: inverse-map correctness is independent of the legacy
+yellow-line calculation.
+
+## Rowan physical-rig checklist
+
+Run at native 7680 x 1440 with Windows scaling controlled, press F11, and view from the calibrated
+centred eye position 520 mm from the centre plane. Confirm that:
+
+- the complete test image is visible across all three displays;
+- circles appear circular and grid cells appear square;
+- horizontal and vertical features appear perceptually straight;
+- diagonals cross views without visible kinks;
+- the horizon is level and continuous and features remain continuous at both joins;
+- left and right views are symmetrical;
+- **D** shows sensible UV gradients, borders, centres, and conspicuous red invalid areas (if any);
+- moving away from the calibrated eye position reduces the apparent correctness;
+- **Tab** restores the validated 0.06 pattern unchanged, **G** restores the grid, F11 still spans,
+  and Escape exits.
+
+Record a seated photograph and note any discontinuity by monitor and edge. Side output is expected
+to look distorted in a flat Windows screenshot; perceived correctness from the calibrated eye is
+the criterion. External-game capture, API hooks, injection, head tracking, upscaling, and
+post-processing are explicitly outside Version 0.07.

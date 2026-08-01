@@ -48,4 +48,15 @@ F11 uses Win32 virtual-desktop coordinates outside `Geometry` to place a borderl
 1440 window. Tab retains the known Version 0.02 grid path. The Version 0.05 display is solely
 diagnostic: it does not perform off-axis projection, bezel/perspective correction, external
 image capture or warping, application modification, or head tracking. Those rendering and
-configuration steps remain for Version 0.06.
+configuration steps remain for Version 0.07.
+
+
+## Full-frame reference mapping
+
+`InverseMapToReference` is platform-independent and is mirrored by `FullFramePixel.hlsl`. It maps
+output pixel -> monitor-local metres -> world point -> calibrated-eye ray -> planar reference UV.
+Desktop offsets exist only in the renderer's panel selection. Geometry does not include Windows,
+D3D, DXGI, HLSL, texture, or presentation types. The shader generates the synthetic source
+analytically, which is equivalent to sampling an internal render target while keeping this proof
+self-contained and deterministic. Invalid coordinates retain their classification and render
+magenta; they are never clamped.

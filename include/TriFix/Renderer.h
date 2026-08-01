@@ -14,7 +14,9 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     void Render();
-    void ToggleCalibrationMode() noexcept { tripleCalibration_ = !tripleCalibration_; }
+    void ToggleCalibrationMode() noexcept { fullFrame_ = !fullFrame_; }
+    void ToggleGridFallback() noexcept { gridFallback_ = !gridFallback_; }
+    void ToggleDiagnostics() noexcept { diagnostics_ = !diagnostics_; }
 
 private:
     void CreateCalibrationGridPipeline();
@@ -33,8 +35,12 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> gridVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> gridPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> calibrationPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> fullFramePixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> fullFrameDiagnosticPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> gridInputLayout_;
-    bool tripleCalibration_ = true;
+    bool fullFrame_ = true;
+    bool gridFallback_ = false;
+    bool diagnostics_ = false;
 };
 
 } // namespace trifix
