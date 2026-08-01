@@ -5,7 +5,7 @@
 namespace trifix {
 
 Application::Application(HINSTANCE instance)
-    : window_(instance, L"TriFix 0.06 - 620x349 mm, 2560x1440 x3, yaw 50 deg, eye 520 mm, bezel 6 mm", 1280, 720),
+    : window_(instance, L"TriFix 0.07 - 620x349 mm, 2560x1440 x3, yaw 50 deg, eye 520 mm, bezel 6 mm", 1280, 720),
       renderer_(window_.Handle()) {}
 
 int Application::Run() {
@@ -21,6 +21,12 @@ int Application::Run() {
             renderer_.ToggleCalibrationMode();
         }
         tabWasDown_ = tabDown;
+        const bool gDown = (GetAsyncKeyState('G') & 0x8000) != 0;
+        if (gDown && !gWasDown_) renderer_.ToggleGridFallback();
+        gWasDown_ = gDown;
+        const bool dDown = (GetAsyncKeyState('D') & 0x8000) != 0;
+        if (dDown && !dWasDown_) renderer_.ToggleDiagnostics();
+        dWasDown_ = dDown;
         if (window_.IsMinimized()) {
             WaitMessage();
             continue;

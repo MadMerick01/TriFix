@@ -19,6 +19,8 @@ private:
     Renderer renderer_;
     bool f11WasDown_ = false;
     bool tabWasDown_ = false;
+    bool gWasDown_ = false;
+    bool dWasDown_ = false;
 };
 
 } // namespace trifix

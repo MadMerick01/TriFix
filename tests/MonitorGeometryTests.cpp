@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 using namespace TriFix::Geometry;
 
@@ -114,6 +115,68 @@ int main()
     Require(!Intersect({{0.0F, 0.0F, 1.0F}, {0.0F, 0.0F, 1.0F}},
                        DisplayPlane(rig.centre)),
             "behind-origin plane");
+
+    // Full-frame inverse mapping: centre view is an identity into the middle source third.
+    // Wide plane contains even the very oblique rays adjacent to the 50-degree hinges.
+    constexpr float canvasWidth = 12.0F;
+    constexpr float canvasHeight = 4.6F;
+    const auto centreSample = InverseMapToReference(
+        {1280.0F, 720.0F}, rig.centre, rig, 7680U, 1440U, canvasWidth, canvasHeight);
+    Require(centreSample.valid && Near(centreSample.sourcePixels.x, 3840.0F) &&
+                Near(centreSample.sourcePixels.y, 720.0F),
+            "centre inverse map is undistorted");
+
+    const Monitor* monitors[]{&rig.left, &rig.centre, &rig.right};
+    const Vector2 probes[]{{0.0F, 0.0F}, {2560.0F, 0.0F}, {0.0F, 1440.0F},
+                           {2560.0F, 1440.0F}, {1280.0F, 720.0F}, {1.0F, 360.0F},
+                           {2559.0F, 1080.0F}};
+    for (const Monitor* monitor : monitors)
+        for (const Vector2 probe : probes)
+        {
+            const auto sample = InverseMapToReference(
+                probe, *monitor, rig, 7680U, 1440U, canvasWidth, canvasHeight);
+            Require(std::isfinite(sample.monitorPoint.x) && std::isfinite(sample.eyeRay.z) &&
+                        std::isfinite(sample.uv.x) && std::isfinite(sample.uv.y),
+                    "representative inverse map is finite");
+            const Vector3 reconstructed{
+                rig.camera.eyePosition.x + sample.eyeRay.x,
+                rig.camera.eyePosition.y + sample.eyeRay.y,
+                rig.camera.eyePosition.z + sample.eyeRay.z};
+            Require(Near(reconstructed.x, sample.monitorPoint.x) &&
+                        Near(reconstructed.y, sample.monitorPoint.y) &&
+                        Near(reconstructed.z, sample.monitorPoint.z),
+                    "eye-ray round trip agrees with physical point");
+        }
+
+    const auto leftMirror = InverseMapToReference(
+        {411.0F, 337.0F}, rig.left, rig, 7680U, 1440U, canvasWidth, canvasHeight);
+    const auto rightMirror = InverseMapToReference(
+        {2149.0F, 337.0F}, rig.right, rig, 7680U, 1440U, canvasWidth, canvasHeight);
+    Require(Near(leftMirror.uv.x, 1.0F - rightMirror.uv.x) &&
+                Near(leftMirror.uv.y, rightMirror.uv.y) &&
+                leftMirror.valid == rightMirror.valid,
+            "inverse mappings have exact left-right mirror correspondence");
+    const auto invalid = InverseMapToReference(
+        {1280.0F, -10000.0F}, rig.centre, rig, 7680U, 1440U, canvasWidth, canvasHeight);
+    Require(!invalid.valid, "out-of-range source sample is classified without clamping");
+    const auto otherSample = InverseMapToReference(
+        {1919.0F, 1.0F}, other.right, other, 5760U, 1080U, 2.1F, 0.4F);
+    Require(std::isfinite(otherSample.uv.x) && std::isfinite(otherSample.uv.y),
+            "inverse mapping supports a second translated layout");
+
+    for (std::size_t index = 0; index < 3; ++index)
+    {
+        const auto sample = InverseMapToReference(
+            {1280.0F, 720.0F}, *monitors[index], rig, 7680U, 1440U,
+            canvasWidth, canvasHeight);
+        std::cout << "monitor " << index << ": local=(1280,720) physical=("
+                  << sample.monitorPoint.x << ',' << sample.monitorPoint.y << ','
+                  << sample.monitorPoint.z << ") ray=(" << sample.eyeRay.x << ','
+                  << sample.eyeRay.y << ',' << sample.eyeRay.z << ") uv=("
+                  << sample.uv.x << ',' << sample.uv.y << ") source=("
+                  << sample.sourcePixels.x << ',' << sample.sourcePixels.y << ") valid="
+                  << sample.valid << '\n';
+    }
 
     std::cout << "All monitor geometry tests passed.\n";
 }

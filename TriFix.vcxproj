@@ -40,6 +40,7 @@
     <ClInclude Include="include\TriFix\Renderer.h" />
     <ClInclude Include="include\TriFix\Window.h" />
   </ItemGroup>
+  <ItemGroup><None Include="tests\FullFrameMappingTests.py" /></ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Application.cpp" /><ClCompile Include="src\main.cpp" /><ClCompile Include="src\MonitorGeometry.cpp" /><ClCompile Include="src\Renderer.cpp" /><ClCompile Include="src\Window.cpp" />
     <ClCompile Include="tests\MonitorGeometryTests.cpp"><ExcludedFromBuild>true</ExcludedFromBuild></ClCompile>
@@ -48,6 +49,8 @@
     <FxCompile Include="shaders\GridVertex.hlsl"><ShaderType>Vertex</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
     <FxCompile Include="shaders\GridPixel.hlsl"><ShaderType>Pixel</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
     <FxCompile Include="shaders\CalibrationPixel.hlsl"><ShaderType>Pixel</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
+    <FxCompile Include="shaders\FullFramePixel.hlsl"><ShaderType>Pixel</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
+    <FxCompile Include="shaders\FullFrameDiagnosticPixel.hlsl"><ShaderType>Pixel</ShaderType><ShaderModel>5.0</ShaderModel><EntryPointName>main</EntryPointName><ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput></FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
