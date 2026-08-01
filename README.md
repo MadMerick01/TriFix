@@ -38,7 +38,10 @@ The centre circle and square remain unchanged. On each side, every sampled pixel
 intersected with an eye-facing reference plane derived from the physical monitor pose. Their
 outlines therefore look distorted in desktop pixel space but circular and square from the
 calibrated eye point; the two sides are exact geometric mirrors. This diagnostic projection is
-independent of the separately retained amber reference-line construction.
+independent of the separately retained amber reference-line construction. The reference plane's
+pixel scale comes from the physical panel edges projected onto that plane—not from treating the
+620 mm panel width as an eye-facing width—so the generated outlines remain inside their assigned
+2560 x 1440 side regions.
 
 ## Seated visual check and report
 

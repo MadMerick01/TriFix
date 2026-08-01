@@ -100,12 +100,26 @@ float2 ApparentShapePixels(float2 localPixels, uint region)
     float3 referencePoint = eye + distance * ray;
     float3 referenceOffset = referencePoint - monitorCentre;
     float2 referenceLocal = float2(dot(referenceOffset, viewRight), referenceOffset.y);
-    float2 referencePixels = float2(referenceLocal.x / visibleMetres.x + 0.5f,
-                                    0.5f - referenceLocal.y / visibleMetres.y) * resolution;
-    // Mirror the right reference canvas so corresponding left/right boundaries are exact
-    // reflections about their respective screen centres.
-    if (region == 2u)
-        referencePixels.x = resolution.x - referencePixels.x;
+
+    // The eye-facing plane is almost edge-on to a 50-degree side panel.  Consequently its
+    // *projected* horizontal footprint is much narrower than the panel's 620 mm physical
+    // width.  Version 0.06 previously divided referenceLocal by 620 mm, confusing those two
+    // spaces and placing both shapes outside the screen.  Project the physical left/right
+    // panel edges onto the reference plane and use that measured span as the reference-canvas
+    // width.  One isotropic metre-per-pixel scale is used for both axes, so circles remain
+    // circles at the calibrated eye rather than being independently stretched to the panel.
+    float3 leftEdge = monitorCentre - MonitorRight(yaw) * (visibleMetres.x * 0.5f);
+    float3 rightEdge = monitorCentre + MonitorRight(yaw) * (visibleMetres.x * 0.5f);
+    float leftDistance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, leftEdge - eye);
+    float rightDistance = dot(viewNormal, monitorCentre - eye) / dot(viewNormal, rightEdge - eye);
+    float leftReferenceX = dot(eye + leftDistance * (leftEdge - eye) - monitorCentre, viewRight);
+    float rightReferenceX = dot(eye + rightDistance * (rightEdge - eye) - monitorCentre, viewRight);
+    float referenceMinX = min(leftReferenceX, rightReferenceX);
+    float referenceSpan = abs(rightReferenceX - leftReferenceX);
+    float referenceMetresPerPixel = referenceSpan / resolution.x;
+    float2 referencePixels = float2((referenceLocal.x - referenceMinX) / referenceSpan * resolution.x,
+                                    resolution.y * 0.5f -
+                                        referenceLocal.y / referenceMetresPerPixel);
     return referencePixels;
 }
 
