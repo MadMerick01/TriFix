@@ -43,6 +43,20 @@ bool Values(float2 p, float2 o, float s)
     return false;
 }
 
+float PerspectiveReferenceY(float desktopX, uint region)
+{
+    // Preserve the centre segment, then derive both wings from the same outward
+    // distance. This makes their physical slopes exact mirror images while keeping
+    // each wing continuous with the centre segment at its own inner join.
+    const float centreY = 610.0f + desktopX / 96.0f;
+    if (region == 1u)
+        return centreY;
+
+    const float innerJoinX = region == 0u ? 2560.0f : 5120.0f;
+    const float innerJoinY = 610.0f + innerJoinX / 96.0f;
+    return innerJoinY + abs(desktopX - innerJoinX) / 96.0f;
+}
+
 float4 main(float4 position : SV_POSITION) : SV_TARGET
 {
     float2 p = position.xy;
@@ -52,7 +66,7 @@ float4 main(float4 position : SV_POSITION) : SV_TARGET
 
     bool minorGrid = (fmod(q.x, 160.0f) < 1.0f || fmod(q.y, 160.0f) < 1.0f);
     bool reference = abs(q.x - 1280.0f) < 2.0f || abs(q.y - 720.0f) < 2.0f;
-    bool continuous = abs(p.y - (610.0f + p.x / 96.0f)) < 2.0f;
+    bool continuous = abs(p.y - PerspectiveReferenceY(p.x, region)) < 2.0f;
     bool boundary = abs(p.x - 2560.0f) < 4.0f || abs(p.x - 5120.0f) < 4.0f;
     bool crosshair = (abs(q.x - 1280.0f) < 3.0f && abs(q.y - 720.0f) < 80.0f) ||
                      (abs(q.y - 720.0f) < 3.0f && abs(q.x - 1280.0f) < 80.0f);
