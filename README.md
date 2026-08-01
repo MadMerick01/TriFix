@@ -34,7 +34,10 @@ horizontal/vertical references, a centre-reference 400-pixel circle and square, 
 continuous across all three regions. The small lower-left key shows the active resolution and
 rig measurements; the full values also remain in the window title.
 
-The centre circle and square remain unchanged. Side shapes are defined on a unit-depth,
+The centre circle and square remain unchanged. Each side retains its lower circle and square and
+adds an upper counterpart above the amber line. The upper centre is the exact vertical reflection
+of the corresponding lower centre in apparent eye-image-plane coordinates; its radius is shared
+with the lower shape. Side shapes are defined on a unit-depth,
 eye-centred image plane. For every boundary sample, a ray from the calibrated eye through that
 reference point is intersected with the physical side-monitor plane. The resulting monitor-local
 metres are converted independently: 620 mm maps to 2560 horizontal pixels and 349 mm maps to
@@ -59,6 +62,15 @@ The square bounds are `[1671.945,847.691]--[2041.983,1238.725]` on the left and
 All four shapes reconstruct to an apparent 0.164636545 x 0.164636545 unit boundary (aspect
 1.000000000). Pixel-space width and height are deliberately not forced equal; the round-trip
 eye-plane result, rather than a hand-tuned local-pixel aspect ratio, is the correctness test.
+
+The newly added upper shapes have monitor-local bounds
+`[470.862,189.995]--[920.993,609.795]` (left circle) and
+`[1639.007,189.995]--[2089.138,609.795]` (right circle), each 450.132 x 419.800 pixels.
+The upper-square bounds are `[1671.945,201.275]--[2041.983,592.309]` on the left and
+`[518.017,201.275]--[888.055,592.309]` on the right, each 370.038 x 391.034 pixels.
+Every new boundary is finite, remains on its assigned panel and above the amber reference line,
+and round-trips to 0.164636545 x 0.164636545 apparent units (aspect 1.000000000). Corresponding
+upper and lower apparent dimensions are equal, and the two side results are exact mirrors.
 
 ## Seated visual check and report
 

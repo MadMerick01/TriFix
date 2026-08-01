@@ -55,9 +55,10 @@ class SideMonitor:
         return ((local_x / WIDTH + 0.5) * PIXELS[0],
                 (0.5 - local_y / HEIGHT) * PIXELS[1])
 
-    def shape_centre(self, reference_x):
+    def shape_centre(self, reference_x, vertical):
         local_x = reference_x if self.side < 0 else PIXELS[0] - reference_x
-        return self.apparent(self.pixel_to_world((local_x, 1040.0)))
+        lower = self.apparent(self.pixel_to_world((local_x, 1040.0)))
+        return (lower[0], lower[1] if vertical == "lower" else -lower[1])
 
     def radius(self):
         top = self.apparent(self.pixel_to_world((1280.0, 520.0)))
@@ -70,8 +71,8 @@ def bounds(points):
             max(p[0] for p in points), max(p[1] for p in points))
 
 
-def validate_shape(monitor, name):
-    centre = monitor.shape_centre(700.0 if name == "circle" else 1860.0)
+def validate_shape(monitor, name, vertical):
+    centre = monitor.shape_centre(700.0 if name == "circle" else 1860.0, vertical)
     radius = monitor.radius()
     reference = []
     if name == "circle":
@@ -87,6 +88,7 @@ def validate_shape(monitor, name):
                                   (centre[0] - radius, centre[1] - value))[edge])
 
     pixels = [monitor.reference_to_pixel(point) for point in reference]
+    assert all(math.isfinite(value) for point in pixels for value in point)
     assert all(0.0 <= x <= PIXELS[0] and 0.0 <= y <= PIXELS[1] for x, y in pixels)
     # Required reconstruction: local pixel -> physical panel -> eye direction -> image plane.
     reconstructed = [monitor.apparent(monitor.pixel_to_world(point)) for point in pixels]
@@ -121,7 +123,7 @@ def validate_shape(monitor, name):
     pixel_bounds = bounds(pixels)
     assert pixel_bounds[3] - pixel_bounds[1] > 300.0
     assert (pixel_bounds[2] - pixel_bounds[0]) / (pixel_bounds[3] - pixel_bounds[1]) < 2.0
-    print(f"{('left' if monitor.side < 0 else 'right')} {name}: "
+    print(f"{('left' if monitor.side < 0 else 'right')} {vertical} {name}: "
           f"local pixels [{pixel_bounds[0]:.3f}, {pixel_bounds[1]:.3f}]--"
           f"[{pixel_bounds[2]:.3f}, {pixel_bounds[3]:.3f}] "
           f"({pixel_bounds[2]-pixel_bounds[0]:.3f}x{pixel_bounds[3]-pixel_bounds[1]:.3f}); "
@@ -135,20 +137,46 @@ def main():
     assert re.search(r"dot\(ray, imageRight\) / depth, ray\.y / depth", source)
     assert "referenceMetresPerPixel" not in source and "referenceSpan" not in source
     assert re.search(r"float yaw = region == 0u \? -sideYaw : sideYaw", source)
+    assert re.search(r"return float2\(lowerCentre\.x, -lowerCentre\.y\)", source)
+    assert "region != 1u" in source
 
     results = {}
     for side in (-1, 1):
         monitor = SideMonitor(side)
-        for name in ("circle", "square"):
-            results[side, name] = validate_shape(monitor, name)
+        for vertical in ("lower", "upper"):
+            for name in ("circle", "square"):
+                results[side, vertical, name] = validate_shape(monitor, name, vertical)
 
-    for name in ("circle", "square"):
-        left, right = results[-1, name][0], results[1, name][0]
-        assert math.isclose(left[0] + right[2], PIXELS[0], abs_tol=1e-8)
-        assert math.isclose(left[2] + right[0], PIXELS[0], abs_tol=1e-8)
-        assert math.isclose(left[1], right[1], abs_tol=1e-8)
-        assert math.isclose(left[3], right[3], abs_tol=1e-8)
-    print("Round-trip apparent circle/square geometry passed validation.")
+    for vertical in ("lower", "upper"):
+        for name in ("circle", "square"):
+            left, right = results[-1, vertical, name][0], results[1, vertical, name][0]
+            assert math.isclose(left[0] + right[2], PIXELS[0], abs_tol=1e-8)
+            assert math.isclose(left[2] + right[0], PIXELS[0], abs_tol=1e-8)
+            assert math.isclose(left[1], right[1], abs_tol=1e-8)
+            assert math.isclose(left[3], right[3], abs_tol=1e-8)
+            left_monitor, right_monitor = SideMonitor(-1), SideMonitor(1)
+            reference_x = 700.0 if name == "circle" else 1860.0
+            left_centre = left_monitor.shape_centre(reference_x, vertical)
+            right_centre = right_monitor.shape_centre(reference_x, vertical)
+            assert math.isclose(left_centre[0], -right_centre[0], abs_tol=1e-15)
+            assert math.isclose(left_centre[1], right_centre[1], abs_tol=1e-15)
+            assert math.isclose(left_monitor.radius(), right_monitor.radius(), abs_tol=1e-15)
+
+    for side in (-1, 1):
+        for name in ("circle", "square"):
+            lower = results[side, "lower", name][1]
+            upper = results[side, "upper", name][1]
+            assert math.isclose(lower[2] - lower[0], upper[2] - upper[0], abs_tol=1e-12)
+            assert math.isclose(lower[3] - lower[1], upper[3] - upper[1], abs_tol=1e-12)
+            assert math.isclose(lower[0], upper[0], abs_tol=1e-12)
+            assert math.isclose(lower[2], upper[2], abs_tol=1e-12)
+            assert math.isclose(lower[1], -upper[3], abs_tol=1e-12)
+            assert math.isclose(lower[3], -upper[1], abs_tol=1e-12)
+
+    # Every upper boundary is safely above even the lowest (inner-edge) yellow line.
+    assert all(results[side, "upper", name][0][3] < 650.0
+               for side in (-1, 1) for name in ("circle", "square"))
+    print("Round-trip lower/upper apparent circle/square geometry passed validation.")
 
 
 if __name__ == "__main__":
