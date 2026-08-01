@@ -45,16 +45,14 @@ bool Values(float2 p, float2 o, float s)
 
 float PerspectiveReferenceY(float desktopX, uint region)
 {
-    // Preserve the centre segment, then derive both wings from the same outward
-    // distance. This makes their physical slopes exact mirror images while keeping
-    // each wing continuous with the centre segment at its own inner join.
-    const float centreY = 610.0f + desktopX / 96.0f;
+    // A single join height keeps the centre horizontal and makes the equal-width
+    // side segments exact mirrors, with no step at either monitor boundary.
+    const float referenceY = 650.0f;
     if (region == 1u)
-        return centreY;
+        return referenceY;
 
     const float innerJoinX = region == 0u ? 2560.0f : 5120.0f;
-    const float innerJoinY = 610.0f + innerJoinX / 96.0f;
-    return innerJoinY + abs(desktopX - innerJoinX) / 96.0f;
+    return referenceY + abs(desktopX - innerJoinX) / 96.0f;
 }
 
 float4 main(float4 position : SV_POSITION) : SV_TARGET
