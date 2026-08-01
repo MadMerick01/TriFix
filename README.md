@@ -1,27 +1,52 @@
-# TriFix 0.04
+# TriFix 0.05
 
-TriFix is a C++20 Win32 and Direct3D 11 application scaffold. Version 0.04 adds tested, rendering-independent ray-to-centre-monitor geometry and physical-to-pixel conversion while retaining the Version 0.02 calibration grid unchanged.
+TriFix is a C++20 Win32/Direct3D 11 prototype. Version 0.05 adds complete, separately
+tested triple-monitor geometry and a diagnostic spanning calibration pattern. It does **not**
+yet capture, warp, or perspective-correct another application.
 
-## Build
+## Build and controls
 
-1. Open `TriFix.sln` in Visual Studio 2022 Community.
-2. Select either `Debug | x64` or `Release | x64`.
-3. Build and run the `TriFix` project.
+Open `TriFix.sln` in Visual Studio 2022, select `Debug | x64` or `Release | x64`, then
+build and run. The Windows 10/11 SDK and **Desktop development with C++** workload are
+required.
 
-The Windows 10/11 SDK and the **Desktop development with C++** workload are required.
+- **F11** toggles a borderless 7680 x 1440 calibration window beginning at the virtual
+  desktop's detected leftmost/topmost origin. Arrange the three target displays left-to-right
+  as one 7680 x 1440 row first. If other displays extend above or farther left, automatic
+  selection remains intentionally conservative: use windowed mode and Windows Display
+  Settings rather than relying on F11.
+- **Tab** switches between the Version 0.05 triple diagnostic and the retained Version
+  0.02 one-pixel grid.
+- **Escape** always exits, including from borderless mode.
 
-## Layout
+## Measured calibration profile
 
-- `src/` — implementation and Windows entry point
-- `include/` — public application, window, and rendering interfaces
-- `include/TriFix/Geometry/` — rendering-independent geometry data structures
-- `shaders/` — HLSL vertex and pixel shaders
-- `assets/` — reserved for runtime assets
-- `config/` — reserved for calibration and application configuration
-- `docs/` — design and milestone documentation
+The supplied rig has three identical 620 x 349 mm illuminated areas at 2560 x 1440,
+6 mm of bezel on every panel edge, a centre display directly ahead, side displays angled
+inward 50 degrees, and an eye centred 520 mm in front of the centre plane. The 6 mm value
+does not enlarge the active display: two adjacent bezel edges put approximately 12 mm of
+physical material between the illuminated areas.
 
-## Version 0.04 scope
+The pattern divides the back buffer into exact LEFT `[0,2560]`, CENTRE `[2560,5120]`, and
+RIGHT `[5120,7680]` pixel-edge regions. It marks both joins, every display centre and corner,
+horizontal/vertical references, a 400-pixel circle and square, a 400-pixel ruler, and a line
+continuous across all three regions. The small lower-left key shows the active resolution and
+rig measurements; the full values also remain in the window title.
 
-The geometry layer can intersect a ray with a plane, reject parallel and rearward intersections, transform a world point into centre-origin monitor-local physical coordinates, validate it against the bezel-excluding display rectangle, and map it to pixel-edge coordinates. The combined operation deliberately uses only `MonitorLayout::centre`; left/right runtime support is deferred.
+## Seated visual check and report
 
-No geometry calculation is connected to the renderer in this milestone. Version 0.04 does not perform perspective correction, image warping, projection changes, or calibration-grid replacement. The next milestone will integrate the geometry with a rendering/capture path and can then extend the calculation across the side monitors.
+From the normal driving eye position, verify and report:
+
+- whether all three screens are filled at native resolution;
+- whether each centre crosshair is physically centred;
+- whether the red display boundaries align with the monitor joins;
+- whether circles remain circular and squares remain square;
+- whether the continuous amber reference line changes height at either join;
+- whether Windows scaling or taskbars interfere;
+- whether the left and right patterns appear symmetrical.
+
+Version 0.05 proves that physical poses can be built from hinge geometry, rays can select and
+address all three visible rectangles, and a native combined-desktop diagnostic can be
+presented. Version 0.06 still needs off-axis perspective/reprojection integration and
+configuration/display selection. Bezel correction, game capture/modification, and head
+tracking are expressly not claimed here.

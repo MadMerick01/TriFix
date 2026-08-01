@@ -17,6 +17,8 @@ public:
 private:
     Window window_;
     Renderer renderer_;
+    bool f11WasDown_ = false;
+    bool tabWasDown_ = false;
 };
 
 } // namespace trifix

@@ -17,12 +17,15 @@ public:
     [[nodiscard]] HWND Handle() const noexcept { return handle_; }
     [[nodiscard]] bool ProcessMessages(int& exitCode) const;
     [[nodiscard]] bool IsMinimized() const noexcept;
+    void ToggleSpanning();
 
 private:
     static LRESULT CALLBACK WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
 
     HINSTANCE instance_ = nullptr;
     HWND handle_ = nullptr;
+    WINDOWPLACEMENT windowedPlacement_{sizeof(WINDOWPLACEMENT)};
+    bool spanning_ = false;
 };
 
 } // namespace trifix

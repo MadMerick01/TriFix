@@ -10,6 +10,22 @@
 
 namespace TriFix::Geometry
 {
+    enum class MonitorId
+    {
+        Left,
+        Centre,
+        Right
+    };
+
+    struct MonitorHit final
+    {
+        MonitorId monitor{};
+        Vector3 worldPoint{};
+        float distance{};
+        Vector2 localPixels{};
+        Vector2 desktopPixels{};
+    };
+
     /// A forward ray/plane intersection. Distance is the ray parameter t.
     struct RayPlaneIntersection final
     {
@@ -37,5 +53,23 @@ namespace TriFix::Geometry
 
     /// Version 0.04's complete calculation, intentionally operating on only the centre monitor.
     [[nodiscard]] std::optional<Vector2> CentreMonitorPixelIntersection(
+        const Ray& ray, const MonitorLayout& layout) noexcept;
+
+    /// Creates three identical visible rectangles about the centre monitor. The two physical
+    /// hinge points sit one bezel width beyond the centre display edges; each side display is
+    /// placed a further bezel width beyond that same hinge along its own plane.
+    [[nodiscard]] MonitorLayout CreateSymmetricalTripleMonitorLayout(
+        float visibleWidthMetres,
+        float visibleHeightMetres,
+        std::uint32_t resolutionWidth,
+        std::uint32_t resolutionHeight,
+        float bezelWidthMetres,
+        float sideInwardAngleDegrees,
+        Vector3 centrePosition,
+        Vector3 eyePosition) noexcept;
+
+    /// Intersects every closed display rectangle and returns the smallest valid ray parameter.
+    /// Desktop coordinates concatenate left, centre, then right at their full pixel widths.
+    [[nodiscard]] std::optional<MonitorHit> IntersectMonitorLayout(
         const Ray& ray, const MonitorLayout& layout) noexcept;
 }

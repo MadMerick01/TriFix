@@ -14,6 +14,7 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     void Render();
+    void ToggleCalibrationMode() noexcept { tripleCalibration_ = !tripleCalibration_; }
 
 private:
     void CreateCalibrationGridPipeline();
@@ -31,7 +32,9 @@ private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> gridVertexBuffer_;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> gridVertexShader_;
     Microsoft::WRL::ComPtr<ID3D11PixelShader> gridPixelShader_;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> calibrationPixelShader_;
     Microsoft::WRL::ComPtr<ID3D11InputLayout> gridInputLayout_;
+    bool tripleCalibration_ = true;
 };
 
 } // namespace trifix

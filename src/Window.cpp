@@ -81,7 +81,36 @@ bool Window::IsMinimized() const noexcept {
     return IsIconic(handle_) != FALSE;
 }
 
+void Window::ToggleSpanning() {
+    if (!spanning_) {
+        windowedPlacement_.length = sizeof(windowedPlacement_);
+        if (GetWindowPlacement(handle_, &windowedPlacement_) == FALSE) {
+            throw std::runtime_error("Failed to save the window placement.");
+        }
+        SetWindowLongPtrW(handle_, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        // The virtual desktop may begin at a negative coordinate. The diagnostic targets the
+        // leftmost 7680 x 1440 pixels rather than incorrectly assuming screen origin (0, 0).
+        const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        const int top = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        if (SetWindowPos(handle_, HWND_TOP, left, top, 7680, 1440,
+                         SWP_FRAMECHANGED | SWP_SHOWWINDOW) == FALSE) {
+            throw std::runtime_error("Failed to enter triple-monitor spanning mode.");
+        }
+        spanning_ = true;
+    } else {
+        SetWindowLongPtrW(handle_, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+        SetWindowPlacement(handle_, &windowedPlacement_);
+        SetWindowPos(handle_, nullptr, 0, 0, 0, 0,
+                     SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER);
+        spanning_ = false;
+    }
+}
+
 LRESULT CALLBACK Window::WindowProcedure(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && wParam == VK_ESCAPE) {
+        DestroyWindow(window);
+        return 0;
+    }
     if (message == WM_CLOSE) {
         DestroyWindow(window);
         return 0;

@@ -119,12 +119,16 @@ void Renderer::CreateCalibrationGridPipeline() {
 
     const auto vertexBytecode = ReadShaderBytecode(L"GridVertex.cso");
     const auto pixelBytecode = ReadShaderBytecode(L"GridPixel.cso");
+    const auto calibrationBytecode = ReadShaderBytecode(L"CalibrationPixel.cso");
     ThrowIfFailed(device_->CreateVertexShader(vertexBytecode.data(), vertexBytecode.size(), nullptr,
                                                gridVertexShader_.GetAddressOf()),
                   "Failed to create the calibration grid vertex shader.");
     ThrowIfFailed(device_->CreatePixelShader(pixelBytecode.data(), pixelBytecode.size(), nullptr,
                                               gridPixelShader_.GetAddressOf()),
                   "Failed to create the calibration grid pixel shader.");
+    ThrowIfFailed(device_->CreatePixelShader(calibrationBytecode.data(), calibrationBytecode.size(),
+                                              nullptr, calibrationPixelShader_.GetAddressOf()),
+                  "Failed to create the triple-monitor calibration pixel shader.");
 
     constexpr D3D11_INPUT_ELEMENT_DESC inputElement{
         "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0};
@@ -149,7 +153,8 @@ void Renderer::DrawCalibrationGrid() {
     context_->IASetInputLayout(gridInputLayout_.Get());
     context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     context_->VSSetShader(gridVertexShader_.Get(), nullptr, 0);
-    context_->PSSetShader(gridPixelShader_.Get(), nullptr, 0);
+    context_->PSSetShader(tripleCalibration_ ? calibrationPixelShader_.Get() : gridPixelShader_.Get(),
+                          nullptr, 0);
     context_->Draw(6, 0);
 }
 

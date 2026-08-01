@@ -1,24 +1,51 @@
-# Architecture
+# Architecture and geometry conventions (Version 0.05)
 
-TriFix keeps platform lifetime, message handling, and graphics ownership separate:
+`Application`, `Window`, and `Renderer` retain platform lifetime, Win32 display handling,
+and Direct3D ownership respectively. `TriFix::Geometry` contains no platform or graphics API
+dependency. The renderer's diagnostic is a pixel-space full-screen shader, not a projection.
 
-- `Application` owns the top-level services and drives the main loop.
-- `Window` owns Win32 class registration and the native window.
-- `Renderer` owns the Direct3D 11 device, immediate context, swap chain, and render target through `ComPtr` RAII handles.
+## Coordinates and monitor construction
 
-The renderer recreates its back-buffer view when the client area changes. Its calibration pass draws a full-screen vertex-buffer quad and generates a one-pixel grid in a dedicated pixel shader. The pass binds its own pipeline state and derives coverage from the current viewport, leaving future reprojection and presentation passes free to extend the renderer without moving Win32 responsibilities into it.
+Version 0.05 preserves Version 0.04 conventions:
 
-## Geometry conventions (Version 0.04)
+- The right-handed world is +X right, +Y up, +Z forward/away from the viewer.
+- A zero-yaw monitor lies in XY, faces -Z, and is positioned at its illuminated-area centre.
+  Local +X is display-right; local +Y is display-up.
+- Yaw is measured from the centre monitor plane. Positive yaw follows the right-hand rule
+  about +Y (counter-clockwise viewed from above), turning local +X toward world -Z. Thus the
+  left panel has positive inward yaw and the right panel equal negative yaw.
+- Width/height describe illuminated area only. `bezelWidthMetres` retains its established
+  meaning as one physical panel-edge width and never participates in display hit bounds.
 
-The reusable `TriFix::Geometry` layer has no Win32, Direct3D, DXGI, or DirectX dependency. Version 0.04 calculates ray intersections and pixel positions for `MonitorLayout::centre` only; it is intentionally not called by the existing renderer.
+`CreateSymmetricalTripleMonitorLayout` defines centre-panel hinge/join points at local
+`x = +/- (visibleWidth/2 + bezelWidth)`. A side panel's adjoining active edge is placed one
+more bezel width from the same hinge, along that side panel's yawed axis. Its centre follows
+mathematically by another half active width. Consequently each pair of illuminated inner
+edges is separated through the join by two 6 mm bezel widths (approximately 12 mm), without
+hard-coded world positions. The eye position is stored in the resulting layout.
 
-- TriFix uses a right-handed world: **+X is right, +Y is up, and +Z is forward/away from the viewer**.
-- A zero-yaw monitor is centred at `Monitor::position`, lies in the XY plane, and has its display-facing normal along -Z. The position is the physical display area's centre and the monitor-local origin.
-- Positive yaw rotates counter-clockwise about +Y when viewed from above (+Y looking toward the origin), following the right-hand rule. Consequently, positive yaw turns the monitor's local +X edge toward world -Z.
-- Monitor-local +X runs to the display's right edge and local +Y runs to its top edge. Coordinates are metres relative to the display centre.
-- `physicalWidthMetres` and `physicalHeightMetres` describe only the active physical display area. `bezelWidthMetres` is metadata and is **not** included in intersection bounds or pixel conversion.
-- Pixel coordinates use the top-left display edge as `(0, 0)`, with +X right and +Y down. They are continuous pixel-edge coordinates: the right and bottom edges are `(resolutionWidth, resolutionHeight)`, while pixel indices remain one less than those dimensions.
+## Rays and pixels
 
-Ray directions need not be normalised: the reported intersection distance is the ray parameter. A hit at parameter zero is valid; parallel rays and negative-parameter intersections are rejected. Display bounds include all four physical edges.
+All three infinite planes are tested. Parallel, negative-parameter, and outside-rectangle
+intersections are discarded, and the valid hit with the smallest ray parameter is returned.
+Directions need not be normalised and parameter zero remains valid. Bounds include the four
+physical edges.
 
-The Version 0.02 full-screen calibration grid and its projection-free rendering path remain visually and functionally unchanged. A later milestone will connect physical geometry to reprojection, introduce warping/projection changes, and add side-monitor runtime calculations.
+Monitor pixels have a top-left origin, +X right, and +Y down. They are continuous **edge
+coordinates**: exact left/top edges are 0 and exact right/bottom edges are the resolution
+dimensions (2560 and 1440), although the last addressable pixel indices are 2559 and 1439.
+The combined desktop concatenates left at x `[0,2560]`, centre at `[2560,5120]`, and right at
+`[5120,7680]`. Shared numeric endpoints describe the continuous region boundaries; monitor
+identity disambiguates an exact physical edge hit.
+
+The test rig is 620 x 349 mm visible, 2560 x 1440 per panel, 6 mm bezels, +/-50 degree side
+yaw, centre plane z=520 mm with the eye at the origin. Tests also use different dimensions,
+resolution, yaw, translation, and eye distance to prevent calibration-profile hard-coding.
+
+## Rendering scope
+
+F11 uses Win32 virtual-desktop coordinates outside `Geometry` to place a borderless 7680 x
+1440 window. Tab retains the known Version 0.02 grid path. The Version 0.05 display is solely
+diagnostic: it does not perform off-axis projection, bezel/perspective correction, external
+image capture or warping, application modification, or head tracking. Those rendering and
+configuration steps remain for Version 0.06.
