@@ -115,6 +115,15 @@ float2 ApparentShapeCentre(uint region, float referenceX)
     return ApparentCoordinates(local, region);
 }
 
+float2 ApparentUpperShapeCentre(uint region, float referenceX)
+{
+    // Reflect the lower centre vertically on the eye's image plane.  The boundary is
+    // subsequently projected through the same apparent-coordinate test as the lower shape;
+    // no monitor pixels, scale factors, or fitted offsets define this counterpart.
+    float2 lowerCentre = ApparentShapeCentre(region, referenceX);
+    return float2(lowerCentre.x, -lowerCentre.y);
+}
+
 float ApparentShapeRadius(uint region)
 {
     if (region == 1u)
@@ -148,11 +157,18 @@ float4 main(float4 position : SV_POSITION) : SV_TARGET
     float2 squareDelta = abs(shapePoint - ApparentShapeCentre(region, 1860.0f));
     bool square = max(squareDelta.x, squareDelta.y) >= radius - stroke &&
                   max(squareDelta.x, squareDelta.y) <= radius + stroke;
+    float2 upperCircleDelta = shapePoint - ApparentUpperShapeCentre(region, 700.0f);
+    bool upperCircle = region != 1u && abs(length(upperCircleDelta) - radius) < stroke;
+    float2 upperSquareDelta = abs(shapePoint - ApparentUpperShapeCentre(region, 1860.0f));
+    bool upperSquare = region != 1u &&
+                       max(upperSquareDelta.x, upperSquareDelta.y) >= radius - stroke &&
+                       max(upperSquareDelta.x, upperSquareDelta.y) <= radius + stroke;
     bool corners = ((q.x < 35.0f || q.x > 2525.0f) && (q.y < 4.0f || q.y > 1436.0f)) ||
                    ((q.y < 35.0f || q.y > 1405.0f) && (q.x < 4.0f || q.x > 2556.0f));
 
     if (minorGrid) colour = float3(0.12f, 0.12f, 0.16f);
-    if (reference || circle || square) colour = float3(0.1f, 0.75f, 0.9f);
+    if (reference || circle || square || upperCircle || upperSquare)
+        colour = float3(0.1f, 0.75f, 0.9f);
     if (continuous) colour = float3(1.0f, 0.75f, 0.1f);
     if (boundary || corners) colour = float3(1.0f, 0.15f, 0.15f);
     if (crosshair) colour = float3(0.2f, 1.0f, 0.25f);
